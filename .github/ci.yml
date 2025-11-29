@@ -1,28 +1,33 @@
-name: CI   # Name of the workflow
+name: CI
 
-on: [push, pull_request]   # When this workflow is triggered
-# It runs automatically every time you push code or open a pull request.
+on:
+  push:
+    branches:
+      - main
+      - develop  # Run on pushes to main and develop
+  pull_request:
+    branches:
+      - main
+      - develop  # Run on PRs targeting main and develop
 
 jobs:
-  build:                    # A job is a group of steps
-    # runs-on: ubuntu-latest  # The virtual machine (OS) GitHub will use
-    runs-on: windows-latest
+  build:
+    # Changed to run on Linux (ubuntu-latest) as it's faster and more common for CI
+    # If you specifically need Windows, change this back to windows-latest
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-        # ✅ Step 1: Check out your code from GitHub so it can be used in the workflow
-
-      - name: Set up Python
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-        # ✅ Step 2: Install Python version 3.11 on the runner (VM)
-
-      - name: Install deps
+          
+      - name: Install Dependencies
         run: pip install -r requirements.txt
-        # ✅ Step 3: Install all Python packages listed in requirements.txt
-
-      - name: Run tests
+        
+      - name: Run Tests
+        # Replace this with your actual test command (e.g., pytest)
         run: python --version
-        # ✅ Step 4: Example test step — here it just prints the Python version
-        # You can replace this with 'pytest' or your test command later.
