@@ -3,3 +3,10 @@ tqdm
 pandas>=2.0
 python-dateutil
 regex
+transformers>=4.35.0
+torch
+vaderSentiment
+spacy>=3.5.0
+scikit-learn
+transformers
+spacy
