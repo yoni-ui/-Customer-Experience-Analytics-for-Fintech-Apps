@@ -8,10 +8,9 @@ CREATE TABLE IF NOT EXISTS banks (
     app_name VARCHAR(255)
 );
 
--- Reviews table
 CREATE TABLE IF NOT EXISTS reviews (
     review_id SERIAL PRIMARY KEY,
-    external_review_id VARCHAR(255),        -- original review id from Play Store if available
+    external_review_id VARCHAR(255),  -- original review id if available
     bank_id INT REFERENCES banks(bank_id),
     review_text TEXT NOT NULL,
     rating INT,
@@ -22,3 +21,4 @@ CREATE TABLE IF NOT EXISTS reviews (
     source VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+EOF
