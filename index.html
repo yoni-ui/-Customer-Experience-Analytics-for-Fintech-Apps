@@ -1,0 +1,582 @@
+<!-- Chosen Palette: Warm Professional (Stone/Slate/Teal) -->
+<!-- Application Structure Plan: A linear, narrative-driven single-page application (SPA).
+     Structure:
+     1. Hero/Executive Summary: Immediate context setting (Bati Bank BNPL) and high-level project metrics.
+     2. The Challenge (Business Context): Interactive cards explaining the "No Default Label" problem and Basel II regulatory constraints, focusing on the interpretability mandate.
+     3. Methodology (The Proxy): An interactive Scatter/Bubble Chart visualization to demonstrate how RFM clustering conceptually created the proxy target variable by separating the High-Risk (Least Active) cluster.
+     4. Model Performance: A dynamic Horizontal Bar Chart comparing the Champion (Logistic Regression) vs. Challenger (XGBoost) models across the key trade-off metrics (ROC-AUC vs. Explainability).
+     5. MLOps & Deployment: A functional "Mock API Terminal" allowing users to simulate a prediction request to the FastAPI endpoint, and a CSS-based CI/CD pipeline visualizer.
+
+     Reasoning: This structure moves sequentially from the business problem ("Why") to the technical solution ("How") to the final system ("Implementation"), mirroring the project's development flow and maximizing clarity for users exploring a complex ML solution.
+-->
+<!-- Visualization & Content Choices:
+     1. Project Metrics: Simple HTML counter cards for high-level stats.
+     2. RFM Clusters: Chart.js Scatter/Bubble Chart. Goal: Visualize the conceptual separation of risk groups (Proxy Target creation). Interaction: Tooltip hovering provides cluster definitions. Justification: Best way to conceptually plot 3 dimensions (R, F, M) and show cluster separation.
+     3. Model Comparison: Chart.js Horizontal Bar Chart. Goal: Compare the key metrics and trade-offs between LogReg and XGBoost. Interaction: Toggle button to switch between viewing ROC-AUC and an "Interpretability Score". Justification: Directly visualizes the critical decision point of the project (accuracy vs. compliance).
+     4. API Terminal: Custom JS/HTML interface. Goal: Simulate the FastAPI endpoint deployment. Interaction: Click "Send Request" to receive the example JSON response. Justification: Concretely demonstrates Task 6 (Deployment).
+     5. CI/CD Pipeline: CSS Grid/Flex layout with Unicode icons. Goal: Visualize the MLOps process. NO SVG used.
+-->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bati Bank | Credit Risk Model Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f5f4; /* Stone 100 */
+            color: #1c1917; /* Stone 900 */
+        }
+
+        /* Chart Container Strict Styling */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px; 
+            margin-left: auto;
+            margin-right: auto;
+            height: 380px; /* Base height */
+            max-height: 450px;
+        }
+
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 420px;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e7e5e4;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #78716c;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #57534e;
+        }
+
+        .flow-card {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            font-weight: 600;
+            background-color: #fcfcfc;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .flow-arrow::after {
+            content: '→';
+            font-size: 24px;
+            color: #78716c;
+            margin: 0 10px;
+        }
+        @media (max-width: 640px) {
+            .flow-arrow::after {
+                content: '↓';
+                display: block;
+                text-align: center;
+                margin: 10px 0;
+            }
+        }
+        .terminal-text {
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        .nav-active {
+            border-bottom: 2px solid #0f766e; /* Teal 700 */
+            color: #0f766e;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-bold text-stone-800">BNPL Risk <span class="text-teal-600 text-sm font-normal uppercase tracking-wider ml-2">Pipeline</span></span>
+                </div>
+                <div class="hidden md:flex space-x-8 items-center">
+                    <button onclick="scrollToSection('hero')" class="nav-link nav-active text-stone-600 hover:text-teal-600 px-3 py-2 text-sm font-medium transition" data-target="hero">Summary</button>
+                    <button onclick="scrollToSection('business')" class="nav-link text-stone-600 hover:text-teal-600 px-3 py-2 text-sm font-medium transition" data-target="business">Constraints</button>
+                    <button onclick="scrollToSection('methodology')" class="nav-link text-stone-600 hover:text-teal-600 px-3 py-2 text-sm font-medium transition" data-target="methodology">Proxy Model</button>
+                    <button onclick="scrollToSection('modeling')" class="nav-link text-stone-600 hover:text-teal-600 px-3 py-2 text-sm font-medium transition" data-target="modeling">Performance</button>
+                    <button onclick="scrollToSection('deployment')" class="nav-link text-stone-600 hover:text-teal-600 px-3 py-2 text-sm font-medium transition" data-target="deployment">MLOps</button>
+                </div>
+                <div class="flex items-center md:hidden">
+                    <button id="mobile-menu-button" class="text-stone-500 hover:text-stone-700 font-bold">☰</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div id="mobile-menu" class="hidden bg-white shadow-lg md:hidden z-40">
+        <button onclick="scrollToSection('hero'); toggleMobileMenu()" class="block w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">Summary</button>
+        <button onclick="scrollToSection('business'); toggleMobileMenu()" class="block w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">Constraints</button>
+        <button onclick="scrollToSection('methodology'); toggleMobileMenu()" class="block w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">Proxy Model</button>
+        <button onclick="scrollToSection('modeling'); toggleMobileMenu()" class="block w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">Performance</button>
+        <button onclick="scrollToSection('deployment'); toggleMobileMenu()" class="block w-full text-left px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">MLOps</button>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-grow">
+
+        <!-- 1. Hero / Executive Summary -->
+        <section id="hero" class="bg-stone-100 py-16 border-b border-stone-200">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl md:text-5xl font-bold text-stone-900 mb-4 tracking-tight">Credit Risk Probability Model</h1>
+                    <p class="text-xl text-stone-600 max-w-3xl mx-auto">
+                        An end-to-end Machine Learning pipeline transforming alternative transactional data into regulatory-compliant risk signals for Bati Bank's BNPL service.
+                    </p>
+                    <div class="mt-8 flex justify-center space-x-4 text-sm text-stone-500">
+                        <span class="bg-white px-3 py-1 rounded-full shadow-sm">Project: B8W4 Final Report</span>
+                        <span class="bg-white px-3 py-1 rounded-full shadow-sm">Author: Yonas Yishak</span>
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-teal-500">
+                        <div class="text-sm text-stone-500 uppercase font-semibold">Data Size (Rows)</div>
+                        <div class="text-3xl font-bold text-stone-800">~330k</div>
+                        <div class="text-xs text-stone-400 mt-1">Alternative Transaction Data</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
+                        <div class="text-sm text-stone-500 uppercase font-semibold">Champion Model</div>
+                        <div class="text-2xl font-bold text-stone-800">LogReg + WoE</div>
+                        <div class="text-xs text-stone-400 mt-1">Selected for Basel II Compliance</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-indigo-500">
+                        <div class="text-sm text-stone-500 uppercase font-semibold">ROC-AUC (Test)</div>
+                        <div id="roc-auc-display" class="text-3xl font-bold text-stone-800">0.85</div>
+                        <div class="text-xs text-stone-400 mt-1">High predictive power</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-amber-500">
+                        <div class="text-sm text-stone-500 uppercase font-semibold">Deployment</div>
+                        <div class="text-2xl font-bold text-stone-800">FastAPI + Docker</div>
+                        <div class="text-xs text-stone-400 mt-1">Containerized & Reproducible</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. Business Context & Challenge -->
+        <section id="business" class="py-16 bg-white border-t border-stone-200">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="mb-10">
+                    <h2 class="text-3xl font-bold text-stone-900 mb-2">Task 1: Business Constraints</h2>
+                    <p class="text-stone-600 leading-relaxed max-w-3xl">
+                        This section details the two fundamental constraints that defined the entire modeling strategy: the absence of ground truth labels and the strict requirement for regulatory compliance.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Constraint 1: No Labels -->
+                    <div class="bg-stone-50 rounded-xl p-6 border border-stone-200">
+                        <h3 class="text-xl font-semibold text-stone-800 mb-3 flex items-center">
+                            <span class="text-3xl mr-2">🚫</span> No Default Labels
+                        </h3>
+                        <p class="text-stone-600 text-sm mb-4">
+                            **Challenge:** Traditional supervised learning is impossible. The solution requires engineering a **proxy target variable** using customer behavior.
+                        </p>
+                        <p class="text-xs font-semibold text-amber-600">
+                            Potential Risks: Misclassification (behavioral disengagement ≠ default) and Regulatory concerns.
+                        </p>
+                    </div>
+
+                    <!-- Constraint 2: Basel II -->
+                    <div class="bg-stone-50 rounded-xl p-6 border border-stone-200">
+                        <h3 class="text-xl font-semibold text-stone-800 mb-3 flex items-center">
+                            <span class="text-3xl mr-2">⚖️</span> Basel II Interpretability
+                        </h3>
+                        <p class="text-stone-600 text-sm mb-4">
+                            **Mandate:** Models must be transparent and auditable. Complex, non-linear models risk non-compliance.
+                        </p>
+                        <p class="text-xs font-semibold text-teal-600">
+                            Approach: Use Logistic Regression with WoE for guaranteed monotonic transformations and explainable predictions.
+                        </p>
+                    </div>
+
+                    <!-- Constraint 3: Data Quality -->
+                    <div class="bg-stone-50 rounded-xl p-6 border border-stone-200">
+                        <h3 class="text-xl font-semibold text-stone-800 mb-3 flex items-center">
+                            <span class="text-3xl mr-2">📊</span> Data Insights (Task 2 & 3)
+                        </h3>
+                        <ul class="text-stone-600 text-sm list-disc pl-5 space-y-1">
+                            <li>Amounts are skewed, requiring `RobustScaler`.</li>
+                            <li>High-Cardinality features mandate WoE encoding.</li>
+                            <li>Weak raw correlations required **RFM** and aggregate features.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Methodology & Proxy Engineering -->
+        <section id="methodology" class="py-16 bg-stone-50 border-t border-stone-200">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-stone-900 mb-2">Task 4: Proxy Target Engineering (RFM Clustering)</h2>
+                    <p class="text-stone-600">
+                        To enable supervised learning, K-Means clustering ($k=3$) was applied to RFM metrics (Recency, Frequency, Monetary). The cluster representing the least active customers was labeled **High-Risk (1)**.
+                    </p>
+                </div>
+
+                <!-- Interactive Visualization: RFM Clusters -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-stone-200">
+                    <h3 class="font-semibold text-stone-800 mb-6">Conceptual RFM Risk Segmentation</h3>
+                    <div class="chart-container">
+                        <canvas id="rfmChart"></canvas>
+                    </div>
+                    <div class="mt-4 text-center text-sm text-stone-500">
+                        X-Axis: Recency (Days Ago), Y-Axis: Frequency (Transactions), Bubble Size: Monetary Value.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Model Performance and Trade-offs -->
+        <section id="modeling" class="py-16 bg-white border-t border-stone-200">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-stone-900 mb-2">Task 5: Model Training & Tracking</h2>
+                    <p class="text-stone-600 max-w-3xl">
+                        Experiments were tracked with **MLflow**. The core decision was the trade-off between the highly-accurate but less-interpretable Challenger model and the compliant Champion model.
+                    </p>
+                </div>
+                
+                <div class="bg-stone-50 p-6 rounded-xl shadow-inner border border-stone-200">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 id="chart-title" class="font-semibold text-stone-800 text-lg">Model Comparison: ROC-AUC</h3>
+                        <button id="toggle-metric" class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-teal-700 transition shadow-md">
+                            Toggle Metric: Interpretability
+                        </button>
+                    </div>
+                    <div class="chart-container h-96">
+                        <canvas id="modelChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                    <div class="p-4 bg-white rounded-lg shadow-sm border border-stone-200">
+                        <div class="text-2xl font-bold text-teal-600">✓</div>
+                        <div class="text-sm font-medium">Champion: Logistic Regression</div>
+                    </div>
+                    <div class="p-4 bg-white rounded-lg shadow-sm border border-stone-200">
+                        <div class="text-2xl font-bold text-blue-600">MLflow</div>
+                        <div class="text-sm font-medium">Tracking and Registry</div>
+                    </div>
+                    <div class="p-4 bg-white rounded-lg shadow-sm border border-stone-200">
+                        <div class="text-2xl font-bold text-indigo-600">80/20</div>
+                        <div class="text-sm font-medium">Fixed Random State Split</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Deployment and CI/CD -->
+        <section id="deployment" class="py-16 bg-stone-50 border-t border-stone-200">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-stone-900 mb-2">Task 6: MLOps & Production Readiness</h2>
+                    <p class="text-stone-600">
+                        The model is containerized and deployed via **FastAPI**, backed by a robust CI/CD pipeline to ensure quality and reproducibility in production systems.
+                    </p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Mock API Terminal -->
+                    <div class="bg-stone-900 p-6 rounded-xl shadow-2xl">
+                        <h3 class="text-xl font-semibold text-green-400 terminal-text mb-4">FastAPI Endpoint Mock: /predict</h3>
+                        <div class="bg-stone-800 p-3 rounded-lg text-sm terminal-text text-stone-300 h-48 overflow-auto mb-4">
+                            <span class="text-green-500">$ curl -X POST /predict</span><br>
+                            <span class="text-yellow-500">Request Body:</span><br>
+                            <pre id="api-request-body" class="whitespace-pre-wrap"></pre>
+                        </div>
+                        <button id="send-request-button" class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-teal-700 transition w-full font-medium">
+                            Simulate Prediction Request
+                        </button>
+                        <div id="api-response" class="bg-stone-800 p-3 rounded-lg text-sm terminal-text text-white mt-4 hidden h-24 overflow-auto">
+                            <span class="text-green-500">Status: 200 OK</span><br>
+                            <span class="text-yellow-500">Response:</span><br>
+                            <pre id="api-response-content" class="whitespace-pre-wrap"></pre>
+                        </div>
+                    </div>
+
+                    <!-- CI/CD Flowchart (HTML/CSS) -->
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-stone-200">
+                        <h3 class="text-xl font-semibold text-stone-800 mb-4">CI/CD Pipeline (Lint & Test)</h3>
+                        <div class="flex flex-col sm:flex-row items-center justify-between text-xs text-stone-700 font-medium">
+                            <div class="flow-card bg-blue-100 text-blue-800"><span class="text-lg">📦</span> Code Commit</div>
+                            <div class="flow-arrow h-4 sm:h-auto"></div>
+                            <div class="flow-card bg-gray-100 text-gray-800"><span class="text-lg">🧹</span> Linting (Flake8/Black)</div>
+                            <div class="flow-arrow h-4 sm:h-auto"></div>
+                            <div class="flow-card bg-yellow-100 text-yellow-800"><span class="text-lg">🧪</span> Testing (Pytest)</div>
+                            <div class="flow-arrow h-4 sm:h-auto"></div>
+                            <div class="flow-card bg-green-100 text-green-800"><span class="text-lg">✅</span> Deploy (Docker Build)</div>
+                        </div>
+                        <p class="mt-6 text-sm text-stone-600">
+                            The automated pipeline ensures quality control (linting, pytest) before the containerized model is built and ready for deployment, guaranteeing system consistency and reliability.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. Conclusion and References -->
+        <section id="conclusion" class="py-16 bg-white border-t border-stone-200">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-stone-900 mb-6">Conclusion & Summary</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-xl font-semibold text-stone-800 mb-3">Key Takeaways</h3>
+                        <ul class="list-disc pl-5 space-y-2 text-stone-600">
+                            <li>**Proxy target** allows supervised modeling in the absence of default labels.</li>
+                            <li>**RFM features and aggregate metrics** are critical for predictive performance.</li>
+                            <li>**Interpretable models** comply with Basel II while providing transparency.</li>
+                            <li>**Containerized FastAPI deployment** ensures reproducibility and scalability.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-stone-800 mb-3">References</h3>
+                        <ul class="space-y-2 text-sm text-stone-600">
+                            <li>Basel II Accord: <a href="https://www.bis.org/publ/bcbs128.pdf" class="text-teal-600 hover:underline">bcbs128.pdf</a></li>
+                            <li>Dataset: <a href="https://www.kaggle.com/datasets/atwine/xente-challenge" class="text-teal-600 hover:underline">Xente Challenge | Kaggle</a></li>
+                            <li>Techniques: WoE & IV Packages (xverse, woe)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-stone-800 text-white p-6 mt-12">
+        <div class="max-w-5xl mx-auto text-center text-sm">
+            Credit Risk Probability Model Report © 2025 | Yonas Yishak
+        </div>
+    </footer>
+
+    <script>
+        const DATA = {
+            // Data for RFM Chart (Conceptual)
+            rfmData: [
+                { x: 5, y: 30, r: 25, label: 'High Risk (Least Active)', color: 'rgba(239, 68, 68, 0.7)' }, // Low R, Low F, Low M (small bubble)
+                { x: 15, y: 15, r: 50, label: 'Medium Risk', color: 'rgba(251, 191, 36, 0.7)' },
+                { x: 40, y: 5, r: 75, label: 'Low Risk (Most Active)', color: 'rgba(20, 184, 166, 0.7)' } // High R, High F, High M (large bubble)
+            ],
+            // Data for Model Comparison Chart
+            modelMetrics: {
+                roc_auc: [0.85, 0.91], // LogReg, XGBoost
+                interpretability: [1.0, 0.3] // LogReg (Fully Compliant), XGBoost (Needs Explanation)
+            },
+            modelLabels: ['Logistic Regression (Champion)', 'XGBoost (Challenger)'],
+            // Mock API Response
+            apiResponse: {
+                "risk_probability": 0.1245,
+                "risk_segment": "Low Risk",
+                "recommendation": "Approve",
+                "model_version": "LogReg_v1.0.0",
+                "explanation_of_risk": "Low Recency (3 days), High Frequency (50 transactions), and High Monetary Value ($25,000) are strong indicators of user engagement."
+            }
+        };
+
+        let rfmChart, modelChart;
+        let currentMetric = 'roc_auc';
+
+        function createRFMChart() {
+            const ctx = document.getElementById('rfmChart').getContext('2d');
+            rfmChart = new Chart(ctx, {
+                type: 'bubble',
+                data: {
+                    datasets: DATA.rfmData.map(item => ({
+                        label: item.label,
+                        data: [{ x: item.x, y: item.y, r: item.r * 0.15 }], 
+                        backgroundColor: item.color,
+                        borderColor: item.color.replace('0.7', '1'),
+                        borderWidth: 2
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Recency (Days Ago - Lower is Better)' },
+                            min: 0, max: 50, ticks: { stepSize: 10 },
+                            grid: { display: false }
+                        },
+                        y: {
+                            title: { display: true, text: 'Frequency (Total Transactions - Higher is Better)' },
+                            min: 0, max: 40, ticks: { stepSize: 10 },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const data = context.dataset.data[0];
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    label += `R: ${data.x} days, F: ${data.y}, M (size)`;
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createModelChart() {
+            const ctx = document.getElementById('modelChart').getContext('2d');
+            modelChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: DATA.modelLabels,
+                    datasets: [{
+                        label: 'ROC-AUC Score',
+                        data: DATA.modelMetrics.roc_auc,
+                        backgroundColor: ['#0f766e', '#1e40af'], // Teal, Blue
+                        borderColor: ['#0d9488', '#1d4ed8'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 1.0,
+                            title: { display: true, text: 'Metric Value' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].label;
+                                },
+                                label: function(context) {
+                                    const metricName = currentMetric === 'roc_auc' ? 'ROC-AUC' : 'Interpretability Score';
+                                    const value = context.parsed.x;
+                                    return `${metricName}: ${value.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateModelChart() {
+            const isRocAuc = currentMetric === 'roc_auc';
+            const dataSet = isRocAuc ? DATA.modelMetrics.roc_auc : DATA.modelMetrics.interpretability;
+            const label = isRocAuc ? 'ROC-AUC Score' : 'Interpretability Score (1.0 = Fully Compliant)';
+            const colors = isRocAuc ? ['#0f766e', '#1e40af'] : ['#0d9488', '#f59e0b']; // Teal/Blue or Teal/Amber
+
+            modelChart.data.datasets[0].data = dataSet;
+            modelChart.data.datasets[0].label = label;
+            modelChart.data.datasets[0].backgroundColor = colors;
+            modelChart.options.scales.x.max = isRocAuc ? 1.0 : 1.0;
+            document.getElementById('chart-title').textContent = `Model Comparison: ${label}`;
+            
+            // Update the display text for the main metric card
+            if (isRocAuc) {
+                document.getElementById('roc-auc-display').textContent = '0.85';
+                document.getElementById('roc-auc-display').parentElement.querySelector('.text-xs').textContent = 'High predictive power';
+            } else {
+                document.getElementById('roc-auc-display').textContent = '1.00';
+                document.getElementById('roc-auc-display').parentElement.querySelector('.text-xs').textContent = 'Basel II Compliant (LogReg)';
+            }
+
+            modelChart.update();
+        }
+
+        function toggleMetric() {
+            currentMetric = currentMetric === 'roc_auc' ? 'interpretability' : 'roc_auc';
+            document.getElementById('toggle-metric').textContent = `Toggle Metric: ${currentMetric === 'roc_auc' ? 'Interpretability' : 'ROC-AUC'}`;
+            updateModelChart();
+        }
+
+        function handleAPISimulation() {
+            const button = document.getElementById('send-request-button');
+            const responseDiv = document.getElementById('api-response');
+            const responseContent = document.getElementById('api-response-content');
+
+            button.disabled = true;
+            button.textContent = 'Sending Request...';
+            responseDiv.classList.add('hidden');
+
+            setTimeout(() => {
+                responseContent.textContent = JSON.stringify(DATA.apiResponse, null, 2);
+                responseDiv.classList.remove('hidden');
+                button.textContent = 'Request Sent (Simulated)';
+                button.classList.add('bg-green-600', 'hover:bg-green-700');
+                button.classList.remove('bg-teal-600', 'hover:bg-teal-700');
+                button.disabled = false;
+            }, 1000);
+        }
+
+        function setInitialRequestJSON() {
+            document.getElementById('api-request-body').textContent = JSON.stringify({
+                "Amount": 1500.0,
+                "Value": 1500.0,
+                "PricingStrategy": 1,
+                "Recency": 10,
+                "Frequency": 5,
+                // ... 30+ other features...
+            }, null, 2).slice(0, 160) + "\n  // ... (30+ features required) ...\n}";
+        }
+
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+            // Update active state in desktop nav
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('nav-active');
+                if (link.dataset.target === id) {
+                    link.classList.add('nav-active');
+                }
+            });
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
+
+        window.onload = function() {
+            createRFMChart();
+            createModelChart();
+            setInitialRequestJSON();
+
+            document.getElementById('toggle-metric').addEventListener('click', toggleMetric);
+            document.getElementById('send-request-button').addEventListener('click', handleAPISimulation);
+            document.getElementById('mobile-menu-button').addEventListener('click', toggleMobileMenu);
+
+            // Initial scroll to hero and set nav state
+            scrollToSection('hero');
+        };
+    </script>
+</body>
+</html>
